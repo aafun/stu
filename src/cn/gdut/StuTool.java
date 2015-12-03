@@ -344,15 +344,9 @@ public class StuTool {
     }
 
     public static void main(String[] args) throws Exception {
-        //Ocr ocr = new Ocr();
-        //for (int i = 1; i <= 20; ++i) {
-        //    String ocr1 = ocr("pic\\" + i + ".png");
-        //}
-        //Thumbnails.of()
         System.out.println("StuTool Main Method!");
         StuTool st = new StuTool();
         st.setImage("F:\\BaiduYunDownload\\pic\\pic\\28.png");
-        // Thumbnails.of(st.bi).size(60,20).toFile("D:\\workspace\\java\\pic\\11.png");
         st.stu();
     }
 }

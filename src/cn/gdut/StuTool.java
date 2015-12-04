@@ -319,7 +319,7 @@ public class StuTool {
         }
 
         BufferedImage zmsz = bi.getSubimage(x1, y1, x2 - x1 + 1, y2 - y1 + 1);
-        res.add(zmsz);
+        res.add(RotateImage.Rotate(zmsz, 0, 120, 120));
 
         first_pixel = true;
         for (int x = x2 + 11; x < width; ++x) {

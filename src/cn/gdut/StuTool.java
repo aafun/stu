@@ -1,7 +1,5 @@
 package cn.gdut;
 
-import sun.awt.image.BufferedImageDevice;
-
 import javax.imageio.ImageIO;
 import java.awt.*;
 import java.awt.image.BufferedImage;
@@ -42,13 +40,30 @@ public class StuTool {
         return bi;
     }
 
-    private void testRead() throws Exception{
-        ImageIO.read(new File("pic\\2.png"));
-    }
+    public void train() {
+        String pic_path = "pic\\";
+        File pic_dir = new File(pic_path);
+        if (!pic_dir.exists() && !pic_dir.isDirectory()) {
+            System.out.println("The training picture files directory is not correct! Please check it!");
+            return;
+        }
+        File[] pic_files = pic_dir.listFiles();
+        if (pic_files.length == 0) {
+            System.out.println("No picture file is found under " + pic_path + " ! Please check it!");
+            return;
+        }
+        for (int i = 0; i < pic_files.length; ++i) {
+            File pic_file = pic_files[i];
+            try {
+                BufferedImage img = ImageIO.read(pic_file);
+                List<List<BufferedImage>> res_imgs = regenImages(img);
+            } catch (Exception e) {
+                System.out.println("Exception appear during read(pic_file) or regenImages(img)");
+                e.printStackTrace();
+                continue;
+            }
 
-
-    private void train(){
-
+        }
     }
 
     public String stu() {
@@ -57,37 +72,13 @@ public class StuTool {
             return "";
         }
         try {
-            BufferedImage img = removeBackground(this.bi);
-            //ImageIO.write(img, "PNG", new File("result_" + filename));
-            List<BufferedImage> lbi = splitImage(img);
+            List<List<BufferedImage>> img = regenImages(this.bi);
             return "";
         } catch (Exception e) {
             System.out.println("Failed to identify the image!");
             e.printStackTrace();
             return "";
         }
-    }
-
-    private List<BufferedImage> splitImage(BufferedImage img) {
-        List<BufferedImage> limag = new ArrayList<BufferedImage>();
-        int width = img.getWidth();
-        int height = img.getHeight();
-        List<Integer> xlist = new ArrayList<Integer>();
-        for (int i = 0; i < width; ++i) {
-            int count = 0;
-            for (int j = 0; j < height; ++j) {
-                if (img.getRGB(i, j) == Color.BLACK.getRGB()) {
-                    count++;
-                }
-            }
-            xlist.add(count);
-        }
-        /*for (int i = 0; i < xlist.size(); ++i) {
-            System.out.print(xlist.get(i) + " ");
-        }
-        System.out.println();*/
-
-        return null;
     }
 
     private int isBlack(int pixRGB) {
@@ -194,8 +185,7 @@ public class StuTool {
                 }
             }
         }
-        CleanedBufferedImage result = new CleanedBufferedImage(bi, count);
-        return result;
+        return new CleanedBufferedImage(bi, count);
     }
 
     private int[] getEdge(BufferedImage bi) {
@@ -212,8 +202,7 @@ public class StuTool {
                 }
             }
         }
-        int res[] = {x1, x2, y1, y2};
-        return res;
+        return new int[]{x1, x2, y1, y2};
     }
 
     private BufferedImage rotateClipScale(BufferedImage bi, boolean rotate, int width, int height) throws Exception {
@@ -223,35 +212,29 @@ public class StuTool {
         int y1 = res[2];
         int y2 = res[3];
         BufferedImage subBi = bi.getSubimage(x1, y1, x2 - x1 + 1, y2 - y1 + 1);
-        ImageIO.write(subBi, "PNG", new File("data\\" + "_bi.png"));
-        RotateImage.Rotate(subBi, 15, width, height);
-//        BufferedImage rotBi = RotateImage.Rotate(subBi, 0, width, height);
-//        if (rotate) {
-//            for (int i=90; i >-90; --i) {
-//                BufferedImage _bi = RotateImage.Rotate(subBi, i, width, height);
-//                int _res[] = getEdge(_bi);
-//                if (_res[1] - _res[0] < x2 - x1) {
-//                    rotBi = _bi;
-//                    x2 = _res[1];
-//                    x1 = _res[0];
-//                }
-//            }
-//            ImageIO.write(rotBi, "PNG", new File("data\\" + "_bi_.png"));
-//        }
-
-        //return rotBi;
-        return null;
+        BufferedImage rotBi = RotateImage.Rotate(subBi, 0, width, height);
+        if (rotate) {
+            for (int i=90; i >-90; --i) {
+                BufferedImage _bi = RotateImage.Rotate(subBi, i, width, height);
+                int _res[] = getEdge(_bi);
+                if (_res[1] - _res[0] < x2 - x1) {
+                    rotBi = _bi;
+                    x2 = _res[1];
+                    x1 = _res[0];
+                }
+            }
+        }
+        return rotBi;
     }
 
 
-    private List<BufferedImage> splitCandidate(BufferedImage bi) {
-        List<BufferedImage> res = new ArrayList<BufferedImage>();
+    private List<BufferedImage> splitCandidate(BufferedImage bi) throws Exception {
+        List<BufferedImage> res = new ArrayList<>();
         int width = bi.getWidth();
         int height = bi.getHeight();
         int xpixel[] = new int[width];
         boolean first_pixel = true;
-        boolean last_pixel = false;
-        int x1, x2, y1, y2;
+        int x1 = 0, x2 = 0, y1 = 0, y2 = 0;
         for (int x = 0; x < width; ++x) {
             xpixel[x] = 0;
             for (int y = 0; y < height; ++y) {
@@ -259,94 +242,119 @@ public class StuTool {
                     xpixel[x]++;
                     if (first_pixel) {
                         x1 = x;
-                        y1 = y;
-                        first_pixel = false;
-                    } else if (!last_pixel) {
                         x2 = x;
+                        y1 = y;
                         y2 = y;
+                        first_pixel = false;
+                    } else {
+                        if (x < x1) x1 = x;
+                        if (y < y1) y1 = y;
+                        if (x > x2) x2 = x;
+                        if (y > y2) y2 = y;
                     }
                 }
             }
-            if (!first_pixel && xpixel[x] == 0) last_pixel = true;
+            if (!first_pixel && xpixel[x] == 0) break;
         }
 
-        return null;
+        BufferedImage zmsz = bi.getSubimage(x1, y1, x2 - x1 + 1, y2 - y1 + 1);
+        ImageIO.write(zmsz, "PNG", new File("data\\tmp\\zmsz.png"));
+        res.add(zmsz);
+
+        first_pixel = true;
+        for (int x = x2 + 12; x < width; ++x) {
+            xpixel[x] = 0;
+            for (int y = 0; y < height; ++y) {
+                if (isBlack(bi.getRGB(x, y)) == 1) {
+                    xpixel[x]++;
+                    if (first_pixel) {
+                        x1 = x;
+                        x2 = x;
+                        y1 = y;
+                        y2 = y;
+                        first_pixel = false;
+                    } else {
+                        if (x < x1) x1 = x;
+                        if (y < y1) y1 = y;
+                        if (x > x2) x2 = x;
+                        if (y > y2) y2 = y;
+                    }
+                }
+            }
+        }
+        BufferedImage wenzi = bi.getSubimage(x1, y1, x2 - x1 + 1, y2 - y1 + 1);
+        ImageIO.write(wenzi, "PNG", new File("data\\tmp\\wenzi.png"));
+        res.add(wenzi);
+        
+        return res;
     }
 
-    private BufferedImage removeBackground(BufferedImage bi) throws Exception {
-        BufferedImage img = bi;
-        int width = img.getWidth();
-        int height = img.getHeight();
-        ImageIO.write(img, "PNG", new File("data\\" + "__1.png"));
 
+
+    private List<List<BufferedImage>> regenImages(BufferedImage bi) throws Exception {
+        List<List<BufferedImage>> res_list = new ArrayList<>();
+        int width = bi.getWidth();
+        int height = bi.getHeight();
         for (int x = 0; x < width; ++x) {
             for (int y = 0; y < height; ++y) {
-                int rgb = img.getRGB(x, y);
+                int rgb = bi.getRGB(x, y);
                 int r = (rgb & 0xff0000) >> 16;
                 int g = (rgb & 0xff00) >> 8;
                 int b = (rgb & 0xff);
                 if (r < 150 && g < 150 && b < 150) {
-                    img.setRGB(x, y, Color.BLACK.getRGB());
+                    bi.setRGB(x, y, Color.BLACK.getRGB());
                 } else {
-                    img.setRGB(x, y, Color.WHITE.getRGB());
+                    bi.setRGB(x, y, Color.WHITE.getRGB());
                 }
             }
         }
-
-        ImageIO.write(img, "PNG", new File("data\\" + "1.png"));
-        BufferedImage img1 = img.getSubimage(0, 0, 60, 60);
-        BufferedImage img2 = img.getSubimage(60, 0, 60, 60);
-        BufferedImage img3 = img.getSubimage(120, 0, 60, 60);
+        BufferedImage img1 = bi.getSubimage(0, 0, 60, 60);
+        BufferedImage img2 = bi.getSubimage(60, 0, 60, 60);
+        BufferedImage img3 = bi.getSubimage(120, 0, 60, 60);
         CleanedBufferedImage _cbi1 = clean(img1, 1);
         CleanedBufferedImage _cbi2 = clean(img2, 1);
         CleanedBufferedImage _cbi3 = clean(img3, 1);
-
         CleanedBufferedImage cbi1 = clean(_cbi1.getCbi(), 0);
         CleanedBufferedImage cbi2 = clean(_cbi2.getCbi(), 0);
         CleanedBufferedImage cbi3 = clean(_cbi3.getCbi(), 0);
-
-        ImageIO.write(cbi1.getCbi(), "PNG", new File("data\\" + "_s1_.png"));
-        System.out.println(_cbi1.getCount());
         int tuCount = _cbi1.getCount();
         BufferedImage tu = cbi1.getCbi();
         BufferedImage zi1 = cbi2.getCbi();
         BufferedImage zi2 = cbi3.getCbi();
-
-        ImageIO.write(cbi2.getCbi(), "PNG", new File("data\\" + "_s2_.png"));
-        System.out.println(_cbi2.getCount());
         if (tuCount > _cbi2.getCount()) {
             tu = cbi2.getCbi();
             tuCount = cbi2.getCount();
             zi1 = cbi1.getCbi();
             zi2 = cbi3.getCbi();
         }
-
-        ImageIO.write(cbi3.getCbi(), "PNG", new File("data\\" + "_s3_.png"));
-        System.out.println(_cbi3.getCount());
         if (tuCount > _cbi3.getCount()) {
             tu = cbi3.getCbi();
-            tuCount = cbi3.getCount();
+            // tuCount = cbi3.getCount();
             zi1 = cbi1.getCbi();
             zi2 = cbi2.getCbi();
         }
-
+        List<BufferedImage> tu_list = new ArrayList<>();
         BufferedImage tuxiang = rotateClipScale(tu, true, 120, 120);
-        //ImageIO.write(tuxiang, "PNG", new File("data\\tmp\\" + "tu.png"));
-
+        tu_list.add(tuxiang);
         BufferedImage zi11 = zi1.getSubimage(0, 0, zi1.getWidth(), zi1.getHeight() / 2);
         BufferedImage zi12 = zi1.getSubimage(0, zi1.getHeight() / 2, zi1.getWidth(), zi1.getHeight() / 2);
         BufferedImage zi21 = zi2.getSubimage(0, 0, zi2.getWidth(), zi2.getHeight() / 2);
         BufferedImage zi22 = zi2.getSubimage(0, zi2.getHeight() / 2, zi2.getWidth(), zi2.getHeight() / 2);
-
-
-
-        return img;
+        List<BufferedImage> ab_wenzi_11 = splitCandidate(zi11);
+        List<BufferedImage> ab_wenzi_12 = splitCandidate(zi12);
+        List<BufferedImage> ab_wenzi_21 = splitCandidate(zi21);
+        List<BufferedImage> ab_wenzi_22 = splitCandidate(zi22);
+        res_list.add(tu_list);
+        res_list.add(ab_wenzi_11);
+        res_list.add(ab_wenzi_12);
+        res_list.add(ab_wenzi_21);
+        res_list.add(ab_wenzi_22);
+        return res_list;
     }
 
     public static void main(String[] args) throws Exception {
-        System.out.println("StuTool Main Method!");
         StuTool st = new StuTool();
-        st.setImage("F:\\BaiduYunDownload\\pic\\pic\\28.png");
+        st.setImage("F:\\BaiduYunDownload\\pic\\pic\\3.png");
         st.stu();
     }
 }

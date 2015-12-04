@@ -12,7 +12,6 @@ public class RotateImage {
     private static BufferedImage drawImage(Image src, int angel, int width, int height, int del_x, int del_y) {
         BufferedImage res = null;
         res = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
-
         Graphics2D g2 = res.createGraphics();
         Color old = g2.getColor();
         g2.setPaint(Color.WHITE);
@@ -35,7 +34,6 @@ public class RotateImage {
         //Rectangle rect_des = new java.awt.Rectangle(new Dimension(des_width, des_height));
 
         List<BufferedImage> resList = new ArrayList<BufferedImage>();
-
         BufferedImage res0 = drawImage(src, angel, des_width, des_height, 0, 0);
         BufferedImage res1 = drawImage(src, angel, des_width, des_height, 0, -1);
         BufferedImage res2 = drawImage(src, angel, des_width, des_height, 0, 1);

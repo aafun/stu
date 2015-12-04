@@ -258,7 +258,6 @@ public class StuTool {
         }
 
         BufferedImage zmsz = bi.getSubimage(x1, y1, x2 - x1 + 1, y2 - y1 + 1);
-        ImageIO.write(zmsz, "PNG", new File("data\\tmp\\zmsz.png"));
         res.add(zmsz);
 
         first_pixel = true;
@@ -283,7 +282,6 @@ public class StuTool {
             }
         }
         BufferedImage wenzi = bi.getSubimage(x1, y1, x2 - x1 + 1, y2 - y1 + 1);
-        ImageIO.write(wenzi, "PNG", new File("data\\tmp\\wenzi.png"));
         res.add(wenzi);
         
         return res;

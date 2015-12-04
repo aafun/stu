@@ -52,16 +52,51 @@ public class StuTool {
             System.out.println("No picture file is found under " + pic_path + " ! Please check it!");
             return;
         }
+        int tu_index = 1;
+        int wz_index = 1;
+        int zmsz_index = 1;
+        String tuxiang_path = "data\\tuxiang\\";
+        String wenzi_path = "data\\zhongwen\\";
+        String zimushuzi_path = "data\\zimushuzi\\";
         for (int i = 0; i < pic_files.length; ++i) {
             File pic_file = pic_files[i];
+            BufferedImage img;
+            List<List<BufferedImage>> res_imgs;
+            System.out.println("---------------");
             try {
-                BufferedImage img = ImageIO.read(pic_file);
-                List<List<BufferedImage>> res_imgs = regenImages(img);
+                img = ImageIO.read(pic_file);
+                res_imgs = regenImages(img);
             } catch (Exception e) {
-                System.out.println("Exception appear during read(pic_file) or regenImages(img)");
+                System.out.println("Exception appear when read(pic_file) or regenImages(img)");
                 e.printStackTrace();
                 continue;
             }
+            try {
+                ImageIO.write(res_imgs.get(0).get(0), "PNG", new File(tuxiang_path + tu_index + ".png"));
+                tu_index++;
+                ImageIO.write(res_imgs.get(1).get(0), "PNG", new File(zimushuzi_path + zmsz_index + ".png"));
+                zmsz_index++;
+                ImageIO.write(res_imgs.get(2).get(0), "PNG", new File(zimushuzi_path + zmsz_index + ".png"));
+                zmsz_index++;
+                ImageIO.write(res_imgs.get(3).get(0), "PNG", new File(zimushuzi_path + zmsz_index + ".png"));
+                zmsz_index++;
+                ImageIO.write(res_imgs.get(4).get(0), "PNG", new File(zimushuzi_path + zmsz_index + ".png"));
+                zmsz_index++;
+                ImageIO.write(res_imgs.get(1).get(1), "PNG", new File(wenzi_path + wz_index + ".png"));
+                wz_index++;
+                ImageIO.write(res_imgs.get(2).get(1), "PNG", new File(wenzi_path + wz_index + ".png"));
+                wz_index++;
+                ImageIO.write(res_imgs.get(3).get(1), "PNG", new File(wenzi_path + wz_index + ".png"));
+                wz_index++;
+                ImageIO.write(res_imgs.get(4).get(1), "PNG", new File(wenzi_path + wz_index + ".png"));
+                wz_index++;
+            } catch (Exception e) {
+                System.out.println("Exception appear when ImageIo.write()");
+                e.printStackTrace();
+                continue;
+
+            }
+            System.out.println("++++++++++++++++");
 
         }
     }
@@ -257,11 +292,37 @@ public class StuTool {
             if (!first_pixel && xpixel[x] == 0) break;
         }
 
+        if (x2 - x1 > 10) {
+            first_pixel =  true;
+            x1 = 0; x2 = 0; y1 = 0; y2 = 0;
+            for (int x = 0; x < x1 + 11; ++x) {
+                xpixel[x] = 0;
+                for (int y = 0; y < height; ++y) {
+                    if (isBlack(bi.getRGB(x, y)) == 1) {
+                        xpixel[x]++;
+                        if (first_pixel) {
+                            x1 = x;
+                            x2 = x;
+                            y1 = y;
+                            y2 = y;
+                            first_pixel = false;
+                        } else {
+                            if (x < x1) x1 = x;
+                            if (y < y1) y1 = y;
+                            if (x > x2) x2 = x;
+                            if (y > y2) y2 = y;
+                        }
+                    }
+                }
+                if (!first_pixel && xpixel[x] == 0) break;
+            }
+        }
+
         BufferedImage zmsz = bi.getSubimage(x1, y1, x2 - x1 + 1, y2 - y1 + 1);
         res.add(zmsz);
 
         first_pixel = true;
-        for (int x = x2 + 12; x < width; ++x) {
+        for (int x = x2 + 11; x < width; ++x) {
             xpixel[x] = 0;
             for (int y = 0; y < height; ++y) {
                 if (isBlack(bi.getRGB(x, y)) == 1) {
@@ -315,10 +376,28 @@ public class StuTool {
         CleanedBufferedImage cbi1 = clean(_cbi1.getCbi(), 0);
         CleanedBufferedImage cbi2 = clean(_cbi2.getCbi(), 0);
         CleanedBufferedImage cbi3 = clean(_cbi3.getCbi(), 0);
-        int tuCount = _cbi1.getCount();
+//      int tuCount = _cbi1.getCount();
         BufferedImage tu = cbi1.getCbi();
         BufferedImage zi1 = cbi2.getCbi();
         BufferedImage zi2 = cbi3.getCbi();
+
+        int middle_pixels = get_middel_pixes(cbi1.getCbi());
+        if (middle_pixels < get_middel_pixes(cbi2.getCbi())) {
+            middle_pixels = get_middel_pixes(cbi2.getCbi());
+            tu = cbi2.getCbi();
+            zi1 = cbi1.getCbi();
+            zi2 = cbi3.getCbi();
+        }
+        if (middle_pixels < get_middel_pixes(cbi3.getCbi())) {
+            tu = cbi3.getCbi();
+            zi1 = cbi1.getCbi();
+            zi2 = cbi2.getCbi();
+        }
+
+
+
+/*
+
         if (tuCount > _cbi2.getCount()) {
             tu = cbi2.getCbi();
             tuCount = cbi2.getCount();
@@ -331,6 +410,7 @@ public class StuTool {
             zi1 = cbi1.getCbi();
             zi2 = cbi2.getCbi();
         }
+        */
         List<BufferedImage> tu_list = new ArrayList<>();
         BufferedImage tuxiang = rotateClipScale(tu, true, 120, 120);
         tu_list.add(tuxiang);
@@ -350,9 +430,22 @@ public class StuTool {
         return res_list;
     }
 
+    private int get_middel_pixes(BufferedImage bi) {
+        int width = bi.getWidth();
+        int height = bi.getHeight();
+        int rslt = 0;
+        for (int x = 0; x < width; ++x) {
+            if (isBlack(bi.getRGB(x, height / 2)) == 1) {
+                rslt++;
+            }
+        }
+        return rslt;
+    }
+
     public static void main(String[] args) throws Exception {
         StuTool st = new StuTool();
         st.setImage("F:\\BaiduYunDownload\\pic\\pic\\3.png");
         st.stu();
+        st.train();
     }
 }

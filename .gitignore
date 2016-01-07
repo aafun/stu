@@ -2,6 +2,7 @@
 pic.bk/
 source_data/tmp/
 source_data/test*/
-out/
-tmp/
+out/*
+tmp/*
+stu.iml
 

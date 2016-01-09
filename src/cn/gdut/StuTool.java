@@ -816,9 +816,9 @@ public class StuTool {
     }
 
     private List<Map<String, int[]>> gen_moulds() throws Exception{
-        String tuxiang_data_path = "train_data\\tuxiang";
-        String xuanxiang_data_path = "train_data\\xuanxiang";
-        String wenzi_data_path = "train_data\\wenzi";
+        String tuxiang_data_path = "train_data"+File.separator+"tuxiang";
+        String xuanxiang_data_path = "train_data"+File.separator+"xuanxiang";
+        String wenzi_data_path = "train_data"+File.separator+"wenzi";
         File tuxiang_data_dir = new File(tuxiang_data_path);
         File xuanxiang_data_dir = new File(xuanxiang_data_path);
         File wenzi_data_dir = new File(wenzi_data_path);

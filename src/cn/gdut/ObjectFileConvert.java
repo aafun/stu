@@ -1,9 +1,5 @@
 package cn.gdut;
 
-/**
- * Created by xiaohei on 2016/1/7.
- */
-
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -11,13 +7,17 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 
+/**
+ * 文件本地序列化工具
+ *
+ */
 public class ObjectFileConvert {
 
     /**
-     * �ļ�ת��ΪObject
+     * 文件转化为Object
      *
-     * @param fileName
-     * @return byte[]
+     * @param fileName 源文件
+     * @return Object
      */
     public static Object file2Object(String fileName) {
 
@@ -50,10 +50,10 @@ public class ObjectFileConvert {
     }
 
     /**
-     * ��Object������ļ�
+     * Object转化为文件
      *
-     * @param obj
-     * @param outputFile
+     * @param obj 目标对象
+     * @param outputFile 目标文件
      */
     public static void object2File(Object obj, String outputFile) {
         ObjectOutputStream oos = null;

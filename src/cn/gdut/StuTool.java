@@ -3,28 +3,37 @@ package cn.gdut;
 import javax.imageio.ImageIO;
 import java.awt.*;
 import java.awt.image.BufferedImage;
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
+import java.io.*;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 /**
- * Created by lenovo on 2015/11/25.
+ * 验证识别主工具类
  */
 public class StuTool {
+
+    /** 待识别的验证码图像 */
     private BufferedImage bi = null;
+    /** 图形部分模板 */
     private Map<String, int[]> tuxiang_mould = null;
+    /** 选项部分模板 */
     private Map<String, int[]> xuanxiang_mould = null;
+    /** 文字部分模板 */
     private Map<String, int[]> wenzi_mould = null;
+    /** 所有模板，包括图形文字选项 */
     private List<Map<String, int[]>> moulds = null;
+    /** 默认生成的图像宽度 */
     public static int IMAGE_WIDTH = 75;
+    /** 默认生成的图像高度 */
     public static int IMAGE_HEIGHT = 75;
 
 
+    /**
+     * 默认首先读取本地模板文件 - mould.file
+     * 如果没有本地模板文件，则重新训练样本，需要耗时较长，训练后会生成mould.file
+     */
     public StuTool() {
         File mould_file = new File("mould.file");
         if (!mould_file.exists()) {
@@ -43,6 +52,11 @@ public class StuTool {
         this.wenzi_mould = moulds.get(2);
     }
 
+    /**
+     * 可直接传入待识别的验证码图像，其余同StuTool()
+     * @param filename 待识别的验证码图像文件路径
+     * @see StuTool
+     */
     public StuTool(String filename) {
         File mould_file = new File("mould.file");
         if (!mould_file.exists()) {
@@ -67,6 +81,10 @@ public class StuTool {
         }
     }
 
+    /**
+     * 设置待识别图像
+     * @param filename 文件名
+     */
     public void setImage(String filename) {
         try {
             this.bi = ImageIO.read(new File(filename));
@@ -77,33 +95,65 @@ public class StuTool {
         }
     }
 
+    /**
+     * 获取待识别验证码图像
+     * @return 验证码图像
+     */
     public BufferedImage getImage() {
         return bi;
     }
 
-    public void pre_train() {
-        String pic_path = "pic\\";
+    /**
+     * 此方法用于生成训练样本，实质是对验证码进行切割（切分为图形、选项、文字），进而进行降噪、旋转、同高宽处理
+     * 会在图像所在目录下生成：
+     * tuxiang/存放处理后的图形
+     * wenzi/ 存放处理后的文字图片
+     * xuanxiang/ 存放处理后的选项图片
+     * @param pic_path 必须是验证码存放的目录
+     */
+    public void genTrainData(String pic_path) {
         File pic_dir = new File(pic_path);
-        if (!pic_dir.exists() && !pic_dir.isDirectory()) {
+        if (!pic_dir.exists() || !pic_dir.isDirectory()) {
             System.out.println("The training picture files directory is not correct! Please check it!");
             return;
         }
-        File[] pic_files = pic_dir.listFiles();
+        File[] pic_files = pic_dir.listFiles(new FileFilter() {
+            @Override
+            public boolean accept(File pathname) {
+                return pathname.isFile();
+            }
+        });
         if (pic_files.length == 0) {
             System.out.println("No picture file is found under " + pic_path + " ! Please check it!");
             return;
         }
-        int tu_index = 1;
-        int wz_index = 1;
-        int zmsz_index = 1;
-        String tuxiang_path = "source_data\\tuxiang\\";
-        String wenzi_path = "source_data\\zhongwen\\";
-        String zimushuzi_path = "source_data\\zimushuzi\\";
+        String tuxiang_path = "";
+        String wenzi_path = "";
+        String zimushuzi_path = "";
+        if (!pic_path.endsWith(File.separator)) {
+            tuxiang_path = pic_path + File.separator + "tuxiang" + File.separator;
+            wenzi_path = pic_path + File.separator + "wenzi" + File.separator;
+            zimushuzi_path = pic_path + File.separator + "xuanxiang" + File.separator;
+        } else {
+            tuxiang_path = pic_path + "tuxiang" + File.separator;
+            wenzi_path = pic_path + "zhongwen" + File.separator;
+            zimushuzi_path = pic_path + "zimushuzi" + File.separator;
+        }
+        if (!(new File(tuxiang_path)).exists() || !(new File(tuxiang_path)).isDirectory()) {
+            new File(tuxiang_path).mkdirs();
+        }
+        if (!(new File(wenzi_path)).exists() || !(new File(tuxiang_path)).isDirectory()) {
+            new File(wenzi_path).mkdirs();
+        }
+        if (!(new File(zimushuzi_path)).exists() || !(new File(tuxiang_path)).isDirectory()) {
+            new File(zimushuzi_path).mkdirs();
+        }
         for (int i = 0; i < pic_files.length; ++i) {
             File pic_file = pic_files[i];
+            String pic_file_name = pic_file.getName();
             BufferedImage img;
             List<List<BufferedImage>> res_imgs;
-            System.out.println("---------------");
+            System.out.println("Processing: " + pic_file.getAbsolutePath() + " ...");
             try {
                 img = ImageIO.read(pic_file);
                 res_imgs = regenImages(img);
@@ -113,35 +163,29 @@ public class StuTool {
                 continue;
             }
             try {
-                ImageIO.write(res_imgs.get(0).get(0), "PNG", new File(tuxiang_path + tu_index + ".png"));
-                tu_index++;
-                ImageIO.write(res_imgs.get(1).get(0), "PNG", new File(zimushuzi_path + zmsz_index + ".png"));
-                zmsz_index++;
-                ImageIO.write(res_imgs.get(2).get(0), "PNG", new File(zimushuzi_path + zmsz_index + ".png"));
-                zmsz_index++;
-                ImageIO.write(res_imgs.get(3).get(0), "PNG", new File(zimushuzi_path + zmsz_index + ".png"));
-                zmsz_index++;
-                ImageIO.write(res_imgs.get(4).get(0), "PNG", new File(zimushuzi_path + zmsz_index + ".png"));
-                zmsz_index++;
-                ImageIO.write(res_imgs.get(1).get(1), "PNG", new File(wenzi_path + wz_index + ".png"));
-                wz_index++;
-                ImageIO.write(res_imgs.get(2).get(1), "PNG", new File(wenzi_path + wz_index + ".png"));
-                wz_index++;
-                ImageIO.write(res_imgs.get(3).get(1), "PNG", new File(wenzi_path + wz_index + ".png"));
-                wz_index++;
-                ImageIO.write(res_imgs.get(4).get(1), "PNG", new File(wenzi_path + wz_index + ".png"));
-                wz_index++;
+                ImageIO.write(res_imgs.get(0).get(0), "PNG", new File(tuxiang_path + "tu_" + pic_file_name  + ".png"));
+                ImageIO.write(res_imgs.get(1).get(0), "PNG", new File(zimushuzi_path + "xx_" + pic_file_name + "_1" + ".png"));
+                ImageIO.write(res_imgs.get(2).get(0), "PNG", new File(zimushuzi_path + "xx_" + pic_file_name + "_2" + ".png"));
+                ImageIO.write(res_imgs.get(3).get(0), "PNG", new File(zimushuzi_path + "xx_" + pic_file_name + "_3" + ".png"));
+                ImageIO.write(res_imgs.get(4).get(0), "PNG", new File(zimushuzi_path + "xx_" + pic_file_name + "_4" + ".png"));
+                ImageIO.write(res_imgs.get(1).get(1), "PNG", new File(wenzi_path + "wz_" + pic_file_name + "_1" + ".png"));
+                ImageIO.write(res_imgs.get(2).get(1), "PNG", new File(wenzi_path + "wz_" + pic_file_name + "_2" + ".png"));
+                ImageIO.write(res_imgs.get(3).get(1), "PNG", new File(wenzi_path + "wz_" + pic_file_name + "_3" + ".png"));
+                ImageIO.write(res_imgs.get(4).get(1), "PNG", new File(wenzi_path + "wz_" + pic_file_name + "_4" + ".png"));
             } catch (Exception e) {
                 System.out.println("Exception appear when ImageIo.write()");
                 e.printStackTrace();
                 continue;
 
             }
-            System.out.println("++++++++++++++++");
-
         }
     }
 
+    /**
+     * 进行识别
+     * 注意得先设置待识别的验证码
+     * @return 识别结果
+     */
     public String stu() {
         if (this.bi == null) {
             System.out.println("Image File Not Found!");
@@ -170,50 +214,52 @@ public class StuTool {
             BufferedImage wenzi4 = img.get(4).get(1);
             test_datas.add(img2arr(wenzi4));
             List<String[]> result_list = predict(test_datas);
-            System.out.println("---" + result_list.get(0)[1] + "---" + result_list.get(0)[0]);
-            System.out.println("---" + result_list.get(1)[1] + "---" + result_list.get(1)[0]);
-            System.out.println("---" + result_list.get(2)[1] + "---" + result_list.get(2)[0]);
-            System.out.println("---" + result_list.get(3)[1] + "---" + result_list.get(3)[0]);
-            System.out.println("---" + result_list.get(4)[1] + "---" + result_list.get(4)[0]);
-            System.out.println("---" + result_list.get(5)[1] + "---" + result_list.get(5)[0]);
-            System.out.println("---" + result_list.get(6)[1] + "---" + result_list.get(6)[0]);
-            System.out.println("---" + result_list.get(7)[1] + "---" + result_list.get(7)[0]);
-            System.out.println("---" + result_list.get(8)[1] + "---" + result_list.get(8)[0]);
+            /*
+            System.out.println("predict log：" + result_list.get(0)[1] + "---" + result_list.get(0)[0]);
+            System.out.println("predict log：" + result_list.get(1)[1] + "---" + result_list.get(1)[0]);
+            System.out.println("predict log：" + result_list.get(2)[1] + "---" + result_list.get(2)[0]);
+            System.out.println("predict log：" + result_list.get(3)[1] + "---" + result_list.get(3)[0]);
+            System.out.println("predict log：" + result_list.get(4)[1] + "---" + result_list.get(4)[0]);
+            System.out.println("predict log：" + result_list.get(5)[1] + "---" + result_list.get(5)[0]);
+            System.out.println("predict log：" + result_list.get(6)[1] + "---" + result_list.get(6)[0]);
+            System.out.println("predict log：" + result_list.get(7)[1] + "---" + result_list.get(7)[0]);
+            System.out.println("predict log：" + result_list.get(8)[1] + "---" + result_list.get(8)[0]);
+            */
             if (Float.parseFloat(result_list.get(0)[1]) < 0.4) {
                 double max_f = 0.0;
                 if (Float.parseFloat(result_list.get(1)[1]) > max_f) {
                     max_f = Float.parseFloat(result_list.get(1)[1]);
-                    result = result_list.get(1)[0].replace("_", "").toUpperCase();
+                    result = result_list.get(1)[0].replace("_", "");
                 }
                 if (Float.parseFloat(result_list.get(3)[1]) > max_f) {
                     max_f = Float.parseFloat(result_list.get(3)[1]);
-                    result = result_list.get(3)[0].replace("_", "").toUpperCase();
+                    result = result_list.get(3)[0].replace("_", "");
                 }
                 if (Float.parseFloat(result_list.get(5)[1]) > max_f) {
                     max_f = Float.parseFloat(result_list.get(5)[1]);
-                    result = result_list.get(5)[0].replace("_", "").toUpperCase();
+                    result = result_list.get(5)[0].replace("_", "");
                 }
                 if (Float.parseFloat(result_list.get(7)[1]) > max_f) {
                     max_f = Float.parseFloat(result_list.get(7)[1]);
-                    result = result_list.get(7)[0].replace("_", "").toUpperCase();
+                    result = result_list.get(7)[0].replace("_", "");
                 }
             } else {
                 String tuxiang_result = result_list.get(0)[0].replace(".img", "");
                 double max_f = 0.0;
                 if (result_list.get(2)[0].equals(tuxiang_result) && Float.parseFloat(result_list.get(2)[1]) > max_f) {
-                    result = result_list.get(1)[0].replace("_", "").toUpperCase();
+                    result = result_list.get(1)[0].replace("_", "");
                     max_f = Float.parseFloat(result_list.get(2)[1]);
                 }
                 if (result_list.get(4)[0].equals(tuxiang_result) && Float.parseFloat(result_list.get(4)[1]) > max_f) {
-                    result = result_list.get(3)[0].replace("_", "").toUpperCase();
+                    result = result_list.get(3)[0].replace("_", "");
                     max_f = Float.parseFloat(result_list.get(4)[1]);
                 }
                 if (result_list.get(6)[0].equals(tuxiang_result) && Float.parseFloat(result_list.get(6)[1]) > max_f) {
-                    result = result_list.get(5)[0].replace("_", "").toUpperCase();
+                    result = result_list.get(5)[0].replace("_", "");
                     max_f = Float.parseFloat(result_list.get(6)[1]);
                 }
                 if (result_list.get(8)[0].equals(tuxiang_result)) {
-                    result = result_list.get(7)[0].replace("_", "").toUpperCase();
+                    result = result_list.get(7)[0].replace("_", "");
                     max_f = Float.parseFloat(result_list.get(8)[1]);
                 }
                 if (result.equals("")) {
@@ -228,19 +274,19 @@ public class StuTool {
                     if (tuxiangPixelCount == -1) {
                         if (Float.parseFloat(result_list.get(1)[1]) > max_f) {
                             max_f = Float.parseFloat(result_list.get(1)[1]);
-                            result = result_list.get(1)[0].replace("_", "").toUpperCase();
+                            result = result_list.get(1)[0].replace("_", "");
                         }
                         if (Float.parseFloat(result_list.get(3)[1]) > max_f) {
                             max_f = Float.parseFloat(result_list.get(3)[1]);
-                            result = result_list.get(3)[0].replace("_", "").toUpperCase();
+                            result = result_list.get(3)[0].replace("_", "");
                         }
                         if (Float.parseFloat(result_list.get(5)[1]) > max_f) {
                             max_f = Float.parseFloat(result_list.get(5)[1]);
-                            result = result_list.get(5)[0].replace("_", "").toUpperCase();
+                            result = result_list.get(5)[0].replace("_", "");
                         }
                         if (Float.parseFloat(result_list.get(7)[1]) > max_f) {
                             max_f = Float.parseFloat(result_list.get(7)[1]);
-                            result = result_list.get(7)[0].replace("_", "").toUpperCase();
+                            result = result_list.get(7)[0].replace("_", "");
                         }
                     } else  {
                         int minDiff = tuxiangPixelCount;
@@ -253,7 +299,7 @@ public class StuTool {
                                 minDiff = Math.abs(wenziCount - tuxiangPixelCount);
                             }
                         }
-                        result = result_list.get(simularXuanXiangIndex)[0].replace("_", "").toUpperCase();
+                        result = result_list.get(simularXuanXiangIndex)[0].replace("_", "");
                     }
                 }
             }
@@ -265,6 +311,11 @@ public class StuTool {
         }
     }
 
+    /**
+     * 判断像素是否为黑色
+     * @param pixRGB 像素rgb值
+     * @return 1 黑色 0 非黑色
+     */
     private int isBlack(int pixRGB) {
         if (pixRGB == Color.black.getRGB()) {
             return 1;
@@ -272,6 +323,9 @@ public class StuTool {
         return 0;
     }
 
+    /**
+     * 中间类
+     */
     class CleanedBufferedImage {
         public BufferedImage cbi = null;
         public int count = 0;
@@ -290,6 +344,13 @@ public class StuTool {
         }
     }
 
+    /**
+     * 图像去噪
+     * @param bi 源图像
+     * @param threshold 去噪粒度
+     * @return 去噪后图像以及消除的像素个数
+     * @throws Exception
+     */
     private CleanedBufferedImage clean(BufferedImage bi, int threshold) throws Exception {
         BufferedImage img_cache = new BufferedImage(bi.getWidth(), bi.getHeight(), bi.getType());
         img_cache.setData(bi.getData());
@@ -375,6 +436,11 @@ public class StuTool {
         return new CleanedBufferedImage(bi, count);
     }
 
+    /**
+     * 获取图像边缘
+     * @param bi 源图像
+     * @return 边缘的x1, x2, y1, y2
+     */
     private int[] getEdge(BufferedImage bi) {
         int w = bi.getWidth();
         int h = bi.getHeight();
@@ -392,6 +458,15 @@ public class StuTool {
         return new int[]{x1, x2, y1, y2};
     }
 
+    /**
+     * 旋转切割图像，如果是图形，会做一个旋转处理
+     * @param bi 源图像
+     * @param rotate true 是图形需旋转 false 不是图形不用旋转
+     * @param width 生成的图像宽度
+     * @param height 生成的图像高度
+     * @return 生成的图像
+     * @throws Exception
+     */
     private BufferedImage rotateClipScale(BufferedImage bi, boolean rotate, int width, int height) throws Exception {
         int res[] = getEdge(bi);
         int x1 = res[0];
@@ -414,7 +489,12 @@ public class StuTool {
         return rotBi;
     }
 
-
+    /**
+     * 切分候选项与文字
+     * @param bi 源图像
+     * @return 候选项图像与文字图像
+     * @throws Exception
+     */
     private List<BufferedImage> splitCandidate(BufferedImage bi) throws Exception {
         List<BufferedImage> res = new ArrayList<>();
         int width = bi.getWidth();
@@ -503,23 +583,12 @@ public class StuTool {
         return res;
     }
 
-
-    private String img2str(BufferedImage img) {
-        String res = "";
-        int width = img.getWidth();
-        int height = img.getHeight();
-        int pixel_idx = 1;
-        for (int x = 0; x < width; ++x) {
-            if (x < 31 || x >= 31 + 13) continue;
-            for (int y = 0; y < height; ++y) {
-                if (y < 31 || y >= 31 + 13) continue;
-                res += "" + pixel_idx + ":" + isBlack(img.getRGB(x, y)) + " ";
-                pixel_idx++;
-            }
-        }
-        return res.trim();
-    }
-
+    /**
+     * 图像切分
+     * @param bi 源识别码
+     * @return 切分后的图像列表
+     * @throws Exception
+     */
     private List<List<BufferedImage>> regenImages(BufferedImage bi) throws Exception {
         List<List<BufferedImage>> res_list = new ArrayList<>();
         int width = bi.getWidth();
@@ -546,7 +615,6 @@ public class StuTool {
         CleanedBufferedImage cbi1 = clean(_cbi1.getCbi(), 0);
         CleanedBufferedImage cbi2 = clean(_cbi2.getCbi(), 0);
         CleanedBufferedImage cbi3 = clean(_cbi3.getCbi(), 0);
-//      int tuCount = _cbi1.getCount();
         BufferedImage tu = cbi1.getCbi();
         BufferedImage zi1 = cbi2.getCbi();
         BufferedImage zi2 = cbi3.getCbi();
@@ -563,24 +631,6 @@ public class StuTool {
             zi1 = cbi1.getCbi();
             zi2 = cbi2.getCbi();
         }
-
-
-
-/*
-
-        if (tuCount > _cbi2.getCount()) {
-            tu = cbi2.getCbi();
-            tuCount = cbi2.getCount();
-            zi1 = cbi1.getCbi();
-            zi2 = cbi3.getCbi();
-        }
-        if (tuCount > _cbi3.getCount()) {
-            tu = cbi3.getCbi();
-            // tuCount = cbi3.getCount();
-            zi1 = cbi1.getCbi();
-            zi2 = cbi2.getCbi();
-        }
-        */
         List<BufferedImage> tu_list = new ArrayList<>();
         BufferedImage tuxiang = rotateClipScale(tu, true, StuTool.IMAGE_WIDTH, StuTool.IMAGE_HEIGHT);
         tu_list.add(tuxiang);
@@ -612,184 +662,11 @@ public class StuTool {
         return rslt;
     }
 
-    public void gen_train_data() {
-        int class_num = 1;
-        String train_data_path = "train_data\\";
-        File train_data_dir = new File(train_data_path);
-        if (!train_data_dir.exists() || !train_data_dir.isDirectory()) {
-            System.out.println("train_data path is not correct! please check it!");
-            return;
-        }
-        File[] data_type_dir_arr = train_data_dir.listFiles();
-        BufferedWriter fw = null, fw_name = null;
-        try {
-            fw = new BufferedWriter(new FileWriter(new File("data\\img.train")));
-            fw_name = new BufferedWriter(new FileWriter(new File("data\\img.name")));
-        } catch (Exception e) {
-            System.out.println("Fail to write img.train file.");
-            e.printStackTrace();
-            return;
-        }
-        for (File data_type_dir : data_type_dir_arr) {
-            if (!data_type_dir.isDirectory()) {
-                System.out.println("train_data path [" + data_type_dir.getAbsolutePath() + "] is not a directory!");
-                continue;
-            }
-            File[] data_type_sub_dir_arr = data_type_dir.listFiles();
-            boolean first_line = true;
-            for (File class_name_dir : data_type_sub_dir_arr) {
-                if (!class_name_dir.isDirectory()) continue;
-                String class_name = class_name_dir.getName();
-                try {
-                    fw_name.write(class_num + "=" + class_name);
-                    fw_name.newLine();
-                    fw_name.flush();
-                    fw.flush();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-                System.out.println(class_num + "=" + class_name);
-                for (File img_file : class_name_dir.listFiles()) {
-                    BufferedImage img;
-                    try {
-                        img = ImageIO.read(img_file);
-                    } catch (Exception e) {
-                        System.out.println("File [" + img_file.getAbsolutePath() + "] is not image");
-                        continue;
-                    }
-                    if (img != null) {
-                        int width = img.getWidth();
-                        int height = img.getHeight();
-                        String img_data = "" + class_num + "  ";
-                        int pixel_idx = 1;
-                        if (!first_line) {
-                            try {
-                                fw.newLine();
-                            } catch (IOException e) {
-                                e.printStackTrace();
-                            }
-                        }
-                        first_line = false;
-                        for (int x = 0; x < width; ++x) {
-                            if (x < 31 || x >= 31 + 13) continue;
-                            for (int y = 0; y < height; ++y) {
-                                if (y < 31 || y >= 31 + 13) continue;
-                                img_data += "" + pixel_idx + ":" + isBlack(img.getRGB(x, y)) + " ";
-                                img_data = img_data.trim();
-                                pixel_idx++;
-                            }
-                        }
-                        try {
-                            fw.write(img_data);
-                        } catch (Exception e) {
-                            System.out.println("Fail to write img.gen_train_data with (" +
-                                    img_data +
-                                    ")");
-                            continue;
-                        }
-                    }
-                }
-                class_num++;
-            }
-        }
-        try {
-            fw.flush();
-            fw.close();
-            fw_name.close();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
-
-    public void train() {
-        String[] argvTrain = {
-                "data\\img.train",
-                "data\\img.model"
-        };
-        svm_train svmt = new svm_train();
-        try {
-            System.out.println("training...");
-            svmt.main(argvTrain);
-            System.out.println("done!");
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
-
-    private void gen_test_data() throws Exception {
-        String test_data_path = "source_data\\test\\";
-        File test_data_dir = new File(test_data_path);
-        BufferedWriter fw = null;
-        try {
-            fw = new BufferedWriter(new FileWriter(new File("data\\img.test")));
-        } catch (Exception e) {
-            System.out.println("Fail to write img.test.");
-            e.printStackTrace();
-            return;
-        }
-        for (File f : test_data_dir.listFiles()) {
-            BufferedImage bi = ImageIO.read(f);
-            String test_data = "0  ";
-            test_data += img2str(bi);
-            fw.write(test_data);
-            fw.newLine();
-            fw.flush();
-        }
-        fw.close();
-    }
-
-
-    private List<List<int[]>> gen_test_datas(boolean isTuxiang, String test_data_path) throws Exception {
-        File test_location = new File(test_data_path);
-        List<List<int[]>> res = new ArrayList<>();
-
-        if (test_location.isDirectory()) {
-            for (File f : test_location.listFiles()) {
-                BufferedImage bi = ImageIO.read(f);
-                List<BufferedImage> bil = RotateImage.RotateTestList(bi, isTuxiang, StuTool.IMAGE_WIDTH, StuTool.IMAGE_HEIGHT);
-                List<int[]> r = new ArrayList<>();
-                for (BufferedImage _bi : bil) {
-                    int[] img_data = img2arr(bi);
-                    r.add(img_data);
-                }
-                res.add(r);
-            }
-        } else {
-            BufferedImage bi = ImageIO.read(test_location);
-            List<BufferedImage> bil = RotateImage.RotateTestList(bi, isTuxiang, StuTool.IMAGE_WIDTH, StuTool.IMAGE_HEIGHT);
-            List<int[]> r = new ArrayList<>();
-            int idx = 1;
-            for (BufferedImage _bi : bil) {
-                ImageIO.write(_bi, "PNG", new File("tmp\\" + idx + ".png"));
-                idx++;
-                int[] img_data = img2arr(bi);
-                r.add(img_data);
-            }
-            res.add(r);
-        }
-        return res;
-    }
-
-    private List<int[]> gen_test_datas(boolean isTuxiang, BufferedImage bi) throws Exception {
-        List<int[]> res = new ArrayList<>();
-        res.add(img2arr(bi));
-        return res;
-    }
-
-    private List<int[]> gen_test_datas_deprecated(boolean isTuxiang, BufferedImage bi) throws Exception {
-        List<int[]> res = new ArrayList<>();
-        List<BufferedImage> bil = RotateImage.RotateTestList(bi, isTuxiang, StuTool.IMAGE_WIDTH, StuTool.IMAGE_HEIGHT);
-        int idx = 1;
-        for (BufferedImage _bi : bil) {
-            ImageIO.write(_bi, "PNG", new File("tmp\\" + idx + ".png"));
-            idx++;
-            int[] img_data = img2arr(bi);
-            res.add(img_data);
-        }
-        return res;
-    }
-
-
+    /**
+     * 图像转数列
+     * @param img 源图像
+     * @return 数列
+     */
     public int[] img2arr(BufferedImage img) {
         int arr_size = img.getHeight() * img.getWidth() / (Integer.SIZE - 1);
         if (arr_size % (Integer.SIZE - 1) != 0) arr_size += 1;
@@ -815,6 +692,11 @@ public class StuTool {
         return img_data;
     }
 
+    /**
+     * 生成模板方法
+     * @return 模板列表，含图形、选项、文字模板
+     * @throws Exception
+     */
     private List<Map<String, int[]>> gen_moulds() throws Exception{
         String tuxiang_data_path = "train_data"+File.separator+"tuxiang";
         String xuanxiang_data_path = "train_data"+File.separator+"xuanxiang";
@@ -880,6 +762,11 @@ public class StuTool {
         return moulds;
     }
 
+    /**
+     * 计算整数二进制后数位为1个个数
+     * @param n
+     * @return 整数二进制后数位为1个个数
+     */
     int bitCount(int n) {
         int c = 0;
         for (c = 0; n != 0; ++c) {
@@ -888,62 +775,19 @@ public class StuTool {
         return c;
     }
 
-    private List<String[]> predict_deprecated(List<List<int[]>> test_list) {
+    /**
+     * 预测结果
+     * @param predict_list 待预测的列表
+     * @return 预测结果
+     */
+    private List<String[]> predict(List<int[]> predict_list) {
         List<String[]> res = new ArrayList<>();
         if (this.tuxiang_mould == null || this.wenzi_mould == null || this.xuanxiang_mould == null) {
             System.out.println("The mould contains NULL, please check it!");
             return null;
         }
-        for (int i = 0; i < test_list.size(); i++) {
-            List<int[]> img_data_list = test_list.get(i);
-            Map<String, int[]> mould = new HashMap<>();
-            if (i == 0) mould = this.tuxiang_mould;
-            if (i == 1 || i == 3 || i == 5 || i == 7) mould = this.xuanxiang_mould;
-            if (i == 2 || i == 4 || i == 6 || i == 8) mould = this.wenzi_mould;
-            double max_matrio = 0.0;
-            String res_name = "";
-            for (int[] img_data : img_data_list) {
-                int img_len = 0;
-                for (int j = 0; j < img_data.length - 1; j++) {
-                    img_len += bitCount(img_data[j]);
-                }
-                for (Map.Entry<String, int[]> m : mould.entrySet()) {
-                    int current_len = 0;
-                    String class_name = m.getKey();
-                    int[] m_data = m.getValue();
-                    int m_len = 0;
-                    for (int j = 0; j < m_data.length - 1; j++) {
-                        current_len += bitCount(m_data[j] & img_data[j]);
-                        m_len += bitCount(m_data[j]);
-                    }
-//                    double gap_ratio = 0.0;
-//                    if (m_len > img_len) gap_ratio =  Math.log(m_len - img_len) + 10E-10;
-//                    else if (img_len > m_len) gap_ratio = Math.log(img_len - m_len) + 10E-10;
-//                    else gap_ratio = 10E-10;
-                    double current_matrio = 2 * current_len / (double) (img_len + m_len);
-                    if (current_matrio > max_matrio) {
-                        max_matrio = current_matrio;
-                        res_name = class_name;
-                    }
-                    //System.out.println(current_len);
-                    //System.out.println(m_len);
-                    //System.out.println(current_matrio);
-                }
-            }
-            res.add(new String[]{res_name.replace("_", ""), "" + max_matrio});
-        }
-        return res;
-    }
-
-
-    private List<String[]> predict(List<int[]> test_list) {
-        List<String[]> res = new ArrayList<>();
-        if (this.tuxiang_mould == null || this.wenzi_mould == null || this.xuanxiang_mould == null) {
-            System.out.println("The mould contains NULL, please check it!");
-            return null;
-        }
-        for (int i = 0; i < test_list.size(); i++) {
-            int[] img_data = test_list.get(i);
+        for (int i = 0; i < predict_list.size(); i++) {
+            int[] img_data = predict_list.get(i);
             Map<String, int[]> mould = new HashMap<>();
             if (i == 0) mould = this.tuxiang_mould;
             if (i == 1 || i == 3 || i == 5 || i == 7) mould = this.xuanxiang_mould;
@@ -974,62 +818,35 @@ public class StuTool {
         return res;
     }
 
+    /**
+     * Moulds get方法
+     * @return 所有模板
+     */
     public List<Map<String, int[]>> getMoulds() {
         return this.moulds;
     }
+
+    /**
+     * main方法，简单测试用
+     * @param args
+     * @throws Exception
+     */
     public static void main(String[] args) throws Exception {
+        
         StuTool st = new StuTool();
         System.out.println("------------RESULT----------------");
         long startTime=System.currentTimeMillis();
-        st.setImage("pic\\1447915797272.png");
+        st.setImage("C:\\Users\\xiaohei\\git\\tmp\\stu\\pic\\1447915797272.png");
         System.out.println(st.stu());
         long endTime=System.currentTimeMillis();
         System.out.println("程序运行时间： "+(endTime-startTime)+"ms");
         startTime=System.currentTimeMillis();
-        st.setImage("pic\\1447915796482.png");
+        st.setImage("C:\\Users\\xiaohei\\git\\tmp\\stu\\pic\\1447915796482.png");
         System.out.println(st.stu());
         endTime=System.currentTimeMillis();
         System.out.println("程序运行时间： "+(endTime-startTime)+"ms");
-        //ObjectFileConvert.object2File(st.getMoulds(), "mould.file");
-        //st.setImage("F:\\BaiduYunDownload\\pic\\pic\\3.png");
-        //st.stu();
-        //st.pre_train();
-        //st.gen_train_data();
-//        st.gen_test_data();
-//        st.train();
-//        String[] parg = { "data\\img.test", // 这个是存放测试数据
-//                "data\\img.model", // 调用的是训练以后的模型
-//                "data\\img.result" }; // 生成的结果的文件的路径
-//        svm_predict p = new svm_predict();
-//        p.main(parg);
-        //st.gen_mould();
 
-        //Map<String, int[]> mould = st.gen_mould();
-//
-//        List<List<int[]>> test_list = st.gen_test_datas(true, "C:\\Program Files\\Git\\workspace\\stu\\source_data\\test\\135.png");
-//
-//        List<String[]> res_list = st.predict(test_list);
-//
-//        System.out.println("___RESULT___");
-//        for (String[] res_str : res_list) {
-//            System.out.println(res_str[0]);
-//            System.out.println(res_str[1]);
-//        }
-////
-//        st.rotateClipScale(ImageIO.read(new File("C:\\Program Files\\Git\\workspace\\stu\\source_data\\tmp\\t\\1.png")),true,75, 75);
-//        BufferedImage res = st.rotateClipScale(RotateImage.Rotate(ImageIO.read(new File("C:\\Program Files\\Git\\workspace\\stu\\source_data\\tmp\\t\\1.png")), 91, 75, 75), true, 75, 75);
-//        BufferedImage res1 = RotateImage.Rotate(ImageIO.read(new File("C:\\Program Files\\Git\\workspace\\stu\\source_data\\tmp\\t\\1.png")), 180, 75, 75);
-//        ImageIO.write(res, "PNG", new File("C:\\Program Files\\Git\\workspace\\stu\\source_data\\tmp\\t\\1_.png"));
-//        ImageIO.write(res1, "PNG", new File("C:\\Program Files\\Git\\workspace\\stu\\source_data\\tmp\\t\\1__.png"));
+        st.genTrainData("C:\\Users\\xiaohei\\git\\new_img\\");
 
-
-//        Map<String, int[]> m = new HashMap<>();
-//        m.put("a", new int[]{1, 2, 3});
-//        int a = 0x7fffffff;
-//        System.out.println(a);
-//        int b = 1 << 3;
-//        System.out.println(b & a);
-//        System.out.println(st.bitCount(a));
-//        System.out.println(m.get("a")[2]);
     }
 }
